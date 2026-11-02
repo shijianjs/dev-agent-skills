@@ -33,7 +33,10 @@ dev-agent-skills/
 │       ├── scripts/        # 辅助脚本（可选）
 │       └── references/     # 参考文档（可选）
 ├── AGENTS.md               # 本仓库的技能编写约定
-└── README.md
+├── LICENSE                 # MIT
+├── README.md
+├── .gitattributes          # 统一换行符为 LF
+└── .gitignore
 ```
 
 每个技能一个子目录，目录名与 `SKILL.md` frontmatter 中的 `name` 保持一致。
@@ -56,4 +59,4 @@ dev-agent-skills/
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 shijianjs

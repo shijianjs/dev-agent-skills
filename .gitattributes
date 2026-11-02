@@ -1,0 +1,3 @@
+# 统一换行符：入库统一为 LF，检出保持 LF（不生成 CRLF）
+# Normalize line endings: store LF, check out LF (never CRLF)
+* text=auto eol=lf
