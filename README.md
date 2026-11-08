@@ -21,6 +21,7 @@ npx skills add shijianjs/dev-agent-skills --list
 
 | 技能 | 说明 |
 | --- | --- |
+| [ktjs-type-mapping](skills/ktjs-type-mapping/SKILL.md) | 把上游 npm 包的 TypeScript 声明翻译成 Kotlin/JS `external` 声明时的建模规范（kotlin-wrappers 风格），供 `ktjs-*` 各 wrapper 仓库共用。 |
 | [long-task-tracking](skills/long-task-tracking/SKILL.md) | 为跨多个 AI 对话上下文的长期 Git 开发任务建立和维护持久化进度清单，确保任务范围、完成状态、排除事项和后续工作可以准确恢复。 |
 
 ## 仓库结构
