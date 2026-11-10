@@ -23,6 +23,7 @@ npx skills add shijianjs/dev-agent-skills --list
 | --- | --- |
 | [ktjs-type-mapping](skills/ktjs-type-mapping/SKILL.md) | 把上游 npm 包的 TypeScript 声明翻译成 Kotlin/JS `external` 声明时的建模规范（kotlin-wrappers 风格），供 `ktjs-*` 各 wrapper 仓库共用。 |
 | [long-task-tracking](skills/long-task-tracking/SKILL.md) | 为跨多个 AI 对话上下文的长期 Git 开发任务建立和维护持久化进度清单，确保任务范围、完成状态、排除事项和后续工作可以准确恢复。 |
+| [intellij-mcp-plugins](skills/intellij-mcp-plugins/SKILL.md) | 选型与配置 IntelliJ IDEA 的 MCP 插件（官方内置 / IDE Index MCP / Debugger MCP），并处理 Kotlin 项目里类型层级与实现树工具失效的问题。 |
 
 ## 仓库结构
 
