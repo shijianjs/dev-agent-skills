@@ -132,9 +132,10 @@ private val SHEET: CSSStyleSheet = cssSheet {          // ktjs-dom-kit：emotion
             Transition(PropertyName.borderColor, 0.2.s, TransitionTimingFunction.ease),
             Transition(PropertyName.boxShadow, 0.2.s, TransitionTimingFunction.ease),
         )
-        "&:hover" {
+        pseudo(Pseudos.hover) {                             // 伪类也是类型化常量
             boxShadow = var(shadowHook, BoxShadow(0.px, 10.px, 24.px, rgb(31, 111, 235, 0.18)))
         }
+        pseudos(Pseudos.hover, Pseudos.focusVisible) { … }   // 多个状态共用一个块（many 拼 selector）
     }
     `@media`(MediaType.screen and maxWidth(576.px)) {     // csstype.RuleBuilder 自带
         cardClass { display = Display.block }
@@ -147,9 +148,10 @@ private val SHEET: CSSStyleSheet = cssSheet {          // ktjs-dom-kit：emotion
 ```
 
 收益不看行数，看**还剩多少 CSS 文本要手写**：同一段规则手写是 455 个字符的 CSS，上面一条声明也不用
-手写，只剩名字（自定义属性名、伪类键）。几条实测约束：① 写 `"&:hover"`——`hover {}` 糖自带的选择器
-是 `:hover`、缺 `&`，会被 stylis 当成**后代**选择器（上游缺陷，已报
-JetBrains/kotlin-wrappers#2933）；② 过渡属性名用 `PropertyName.borderColor`（`PropertyName<T> : Ident`、
+手写，只剩名字（自定义属性名）。几条实测约束：① 伪类用 `Pseudos` + `pseudo` / `pseudos`（`TagName` +
+`HtmlTagName` 那套形态，64 个常量、每个带 `&`）；`hover {}` 糖自带的选择器是 `:hover`、缺 `&`，会被
+stylis 当成**后代**选择器，而且就算上游 JetBrains/kotlin-wrappers#2933 修好也写不出组合态，别等它；
+② 过渡属性名用 `PropertyName.borderColor`（`PropertyName<T> : Ident`、
 `IdentType` 里包含 `TransitionProperty`），**不需要 cast**；③ at-rule 别写 `"@media …"` 字符串，官方有
 `RuleBuilder.@media` 与 `web.cssom.AtRules`，媒体条件有 `MediaType` / `maxWidth` / `prefersColorScheme`
 等一整包工厂；`@supports` 条件用 `SupportsQuery` + `supportsDeclaration(PropertyName<T>, T)` +
