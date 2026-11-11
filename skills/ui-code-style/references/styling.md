@@ -115,8 +115,10 @@ class Action : CustomElementAdapter() {
 `@emotion/serialize` + `stylis`（只声明用到的导出，不要写完整 wrapper）：
 
 ```kotlin
+private val cardClass = ClassName("ktjs-feature-card")   // 选择器也类型化，invoke 负责补点号
+
 private val rules: PropertiesBuilder = unsafeJso {
-    ".ktjs-feature-card" {
+    cardClass {
         border = Border(
             1.px,
             LineStyle.solid,
