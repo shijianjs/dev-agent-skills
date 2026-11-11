@@ -117,48 +117,42 @@ class Action : CustomElementAdapter() {
 ```kotlin
 // 自定义属性名各自一个具名常量：字符串只写一次，类型参数是 hook 承载的值类型
 private val cardBorderHook = CustomPropertyName<Color>("--ktjs-card-border")
-private val cardBackgroundHook = CustomPropertyName<Color>("--ktjs-card-bg")
-private val surfaceColorHook = CustomPropertyName<Color>("--ifm-background-surface-color")
 private val shadowHook = CustomPropertyName<BoxShadow>("--ktjs-shadow")
-
 private val cardClass = ClassName("ktjs-feature-card")   // 选择器也类型化，invoke 负责补点号
 // 一次性用可写 (ClassName("x")) { … }：不加括号会被当成「工厂调用 + 尾随 lambda」
 
-private val rules: PropertiesBuilder = unsafeJso {
+private val SHEET: CSSStyleSheet = cssSheet {          // ktjs-dom-kit：emotion + stylis 序列化
     cardClass {
         border = Border(
             1.px,
             LineStyle.solid,
-            // var(name, fallback)：兜底值也是类型化的，不用手写 var(--x, rgba(…))
-            var(cardBorderHook, rgb(127, 127, 127, 0.24)),
+            var(cardBorderHook, rgb(127, 127, 127, 0.24)),   // 兜底值也是类型化的
         )
-        backgroundColor = var(cardBackgroundHook, var(surfaceColorHook, NamedColor.white))
-        transition = many(                                                          // cssom 的多值拼接
+        transition = many(                                  // cssom 的多值拼接
             Transition(PropertyName.borderColor, 0.2.s, TransitionTimingFunction.ease),
             Transition(PropertyName.boxShadow, 0.2.s, TransitionTimingFunction.ease),
         )
-        display = fallback(Display.grid, Display.flex)
         "&:hover" {
             boxShadow = var(shadowHook, BoxShadow(0.px, 10.px, 24.px, rgb(31, 111, 235, 0.18)))
         }
     }
-}
-
-private val SHEET: CSSStyleSheet = CSSStyleSheet().apply {
-    val declarations = serializeStyles(jsArrayOf<JsAny?>(rules.asDynamic()[".ktjs-feature-card"])).styles
-    replaceSync(
-        serialize(compile(".ktjs-feature-card{$declarations}"), middleware(jsArrayOf(stringify))),
-    )
+    `@media`(MediaType.screen and maxWidth(576.px)) {     // csstype.RuleBuilder 自带
+        cardClass { display = Display.block }
+    }
+    supports("(background-clip: text)") { … }             // 关键字来自 web.cssom.AtRules.supports
 }
 ```
 
-收益不看行数，看**还剩多少 CSS 文本要手写**：同一段规则手写是 455 个字符的 CSS，上面一条声明也
-不用手写，只剩名字（过渡属性名、自定义属性名）。三条实测约束：① 写 `"&:hover"`——`hover {}` 糖自带
-的选择器是 `:hover`、缺 `&`，会被 stylis 当成**后代**选择器（上游缺陷，已报
-JetBrains/kotlin-wrappers#2933）；② `TransitionProperty` 的生成代码只暴露 `all`，过渡属性名仍需一个
-`unsafeCast`，封装成一行 `transitionProperty(name)`、别扩散到整条声明；③ 不要用 `kotlin-css`
-（`kotlinx.css`）那套旧 DSL——值不做校验、`transition` 会补 `0s`、`&` 不解析。逐条 `insertRule` 灌
-CSSOM 也不要：同一规则里 `fallback()` 阶梯会被压成最后一条。
+收益不看行数，看**还剩多少 CSS 文本要手写**：同一段规则手写是 455 个字符的 CSS，上面一条声明也不用
+手写，只剩名字（自定义属性名、伪类键）。几条实测约束：① 写 `"&:hover"`——`hover {}` 糖自带的选择器
+是 `:hover`、缺 `&`，会被 stylis 当成**后代**选择器（上游缺陷，已报
+JetBrains/kotlin-wrappers#2933）；② 过渡属性名用 `PropertyName.borderColor`（`PropertyName<T> : Ident`、
+`IdentType` 里包含 `TransitionProperty`），**不需要 cast**；③ at-rule 别写 `"@media …"` 字符串，官方有
+`RuleBuilder.@media` 与 `web.cssom.AtRules`，媒体条件有 `MediaType` / `maxWidth` / `prefersColorScheme`
+等一整包工厂；④ cssom 缺的（`radial-gradient`、`-webkit-` 属性、`pointer-events:none`）在项目自己的
+`css` 包里按官方风格补，别退回文本；⑤ 不要用 `kotlin-css`（`kotlinx.css`）那套旧 DSL——值不做校验、
+`transition` 会补 `0s`、`&` 不解析；逐条 `insertRule` 灌 CSSOM 也不要：`fallback()` 阶梯会被压成最后一条。
+完整清单见 `ktjs-dom-kit/docs/css-sheet.md`。
 
 类名只留给这些规则选中的节点。有了内联样式就不需要「每个节点一个语义 class」，多余 class 会让读者以为
 别处还有规则在用它。
