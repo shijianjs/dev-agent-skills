@@ -131,8 +131,8 @@ private val rules: PropertiesBuilder = unsafeJso {
             var(CustomPropertyName("--ifm-background-surface-color"), Color("#fff")),
         )
         transition = many(                                                          // cssom 的多值拼接
-            Transition(transitionProperty("border-color"), 0.2.s, TransitionTimingFunction.ease),
-            Transition(transitionProperty("box-shadow"), 0.2.s, TransitionTimingFunction.ease),
+            Transition(PropertyName.borderColor, 0.2.s, TransitionTimingFunction.ease),
+            Transition(PropertyName.boxShadow, 0.2.s, TransitionTimingFunction.ease),
         )
         display = fallback(Display.grid, Display.flex)
         "&:hover" {
