@@ -91,12 +91,52 @@ shadow.adoptedStyleSheets = [baseStyles(), heroStyles()];
 ```
 
 ```kotlin
-// 同文件：规则文本 + 模块级 sheet（Kotlin/JS 顶层 val 首次访问才初始化）
-private const val ACTION_CSS = """…"""
-private val ACTION_SHEET: CSSStyleSheet = CSSStyleSheet().apply { replaceSync(ACTION_CSS) }
+// 同文件、同一个类里：规则文本 + 该类的 sheet（companion 是 Kotlin 放「类静态成员」的地方，
+// 对应 Lit 的 static styles；名字统一成 CSS / SHEET，每个元素类都可复用这两个名字）
+class Action : CustomElementAdapter() {
+    init {
+        val shadow = attachStyledShadow(HOME_RESET, SHEET)
+        …
+    }
 
-val shadow = attachStyledShadow(HOME_RESET, ACTION_SHEET)
+    companion object : CustomElementReference<Action>(Action::class.js) {
+        val NAME: TagName<Action> = TagName(HomeMarkup.ACTION)
+
+        private val CSS: String = """
+            .ktjs-button-primary:hover { … }
+        """.trimIndent()
+
+        private val SHEET: CSSStyleSheet = CSSStyleSheet().apply { replaceSync(CSS) }
+    }
+}
 ```
+
+规则变多、值开始重复之后，可以把这段文本换成 csstype 的规则 DSL，序列化交给
+`@emotion/serialize` + `stylis`（只声明用到的导出，不要写完整 wrapper）：
+
+```kotlin
+private val rules: PropertiesBuilder = unsafeJso {
+    ".ktjs-feature-card" {
+        border = Border(1.px, LineStyle.solid, Color("var(--ktjs-card-border, rgba(127, 127, 127, 0.24))"))
+        transition = unsafeCast("border-color 0.2s ease, box-shadow 0.2s ease")
+        display = fallback(Display.grid, Display.flex)
+        "&:hover" { boxShadow = unsafeCast("var(--ktjs-shadow, 0 10px 24px …)") }
+    }
+}
+
+private val SHEET: CSSStyleSheet = CSSStyleSheet().apply {
+    val declarations = serializeStyles(jsArrayOf<JsAny?>(rules.asDynamic()[".ktjs-feature-card"])).styles
+    replaceSync(
+        serialize(compile(".ktjs-feature-card{$declarations}"), middleware(jsArrayOf(stringify))),
+    )
+}
+```
+
+收益不看行数，看**还剩多少 CSS 文本要手写**：上面的边框、整值 `var()` 仍是字符串，但属性名、数值
+单位、伪类结构都由类型给出。三条实测约束：① 写 `&:hover`，`hover {}` 糖产出 `:hover`，会被 stylis
+当成**后代**选择器；② 多值简写与整值 `var()` 需要 `unsafeCast(String)`；③ 不要用 `kotlin-css`
+（`kotlinx.css`）那套旧 DSL——值不做校验、`transition` 会补 `0s`、`&` 不解析。逐条 `insertRule` 灌
+CSSOM 也不要：同一规则里 `fallback()` 阶梯会被压成最后一条。
 
 类名只留给这些规则选中的节点。有了内联样式就不需要「每个节点一个语义 class」，多余 class 会让读者以为
 别处还有规则在用它。

@@ -182,7 +182,11 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/文件按
 - 禁止 `innerHTML` / `insertAdjacentHTML` / 模板字符串拼标记。
 - 禁止把多个组件的样式集中到一个大字符串或一个公共 CSS 文件。
 - 禁止每个组件实例建 `<style>` 节点或新 `CSSStyleSheet`（静态规则本来就只需要一份）。
-- 禁止 CSS-in-JS、CSS DSL、为少量样式引入额外依赖。
+- 禁止为了「少写几行」引入运行时注入式的 CSS-in-JS（把样式塞进 `document` 的 `<style>`）：它绕不开
+  shadow root 的隔离。**类型化的 CSS DSL 不在此列**——用类型约束属性名、把「魔法字符串」压到只剩值层面，
+  是这条规范想要的，不是它禁止的（csstype 的 `PropertiesBuilder` + `@emotion/serialize` 这类序列化器就是
+  这条路）。判断标准不是源码行数：jOOQ 写出来比 SQL 文本长，也没覆盖 SQL 的全部细节，这不妨碍它比裸 SQL
+  类型安全得多——看的是**还剩多少手写 CSS 文本**，不是行数。
 - 禁止为了「可复用」提前抽取：没有两个以上必须一起变的调用方就不要提取。
 - 禁止在构造函数里给自定义元素的 `this` 加属性或子节点。
 - 禁止自研图标/ SVG 封装。
