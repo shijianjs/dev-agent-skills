@@ -139,7 +139,10 @@ private val SHEET: CSSStyleSheet = cssSheet {          // ktjs-dom-kit：emotion
     `@media`(MediaType.screen and maxWidth(576.px)) {     // csstype.RuleBuilder 自带
         cardClass { display = Display.block }
     }
-    supports("(background-clip: text)") { … }             // 关键字来自 web.cssom.AtRules.supports
+    supports(                                              // SupportsQuery 仿 MediaQuery：条件也类型化
+        supportsDeclaration(PropertyName.backgroundClip, BackgroundClip.text) or
+            supportsDeclaration(webkitBackgroundClipName, BackgroundClip.text),
+    ) { … }
 }
 ```
 
@@ -149,8 +152,10 @@ private val SHEET: CSSStyleSheet = cssSheet {          // ktjs-dom-kit：emotion
 JetBrains/kotlin-wrappers#2933）；② 过渡属性名用 `PropertyName.borderColor`（`PropertyName<T> : Ident`、
 `IdentType` 里包含 `TransitionProperty`），**不需要 cast**；③ at-rule 别写 `"@media …"` 字符串，官方有
 `RuleBuilder.@media` 与 `web.cssom.AtRules`，媒体条件有 `MediaType` / `maxWidth` / `prefersColorScheme`
-等一整包工厂；④ cssom 缺的（`radial-gradient`、`-webkit-` 属性、`pointer-events:none`）在项目自己的
-`css` 包里按官方风格补，别退回文本；⑤ 不要用 `kotlin-css`（`kotlinx.css`）那套旧 DSL——值不做校验、
+等一整包工厂；`@supports` 条件用 `SupportsQuery` + `supportsDeclaration(PropertyName<T>, T)` +
+`and/or/not`（仿 `MediaQuery` 补的），别传条件字符串；④ cssom 缺的（`radial-gradient`、`-webkit-` 属性、
+`pointer-events:none`、supports 条件类型）在项目自己的 `css` 包里按官方风格补，别退回文本；
+⑤ 不要用 `kotlin-css`（`kotlinx.css`）那套旧 DSL——值不做校验、
 `transition` 会补 `0s`、`&` 不解析；逐条 `insertRule` 灌 CSSOM 也不要：`fallback()` 阶梯会被压成最后一条。
 完整清单见 `ktjs-dom-kit/docs/css-sheet.md`。
 
