@@ -128,7 +128,7 @@ private val rules: PropertiesBuilder = unsafeJso {
         )
         backgroundColor = var(
             CustomPropertyName("--ktjs-card-bg"),
-            var(CustomPropertyName("--ifm-background-surface-color"), Color("#fff")),
+            var(CustomPropertyName("--ifm-background-surface-color"), NamedColor.white),
         )
         transition = many(                                                          // cssom 的多值拼接
             Transition(PropertyName.borderColor, 0.2.s, TransitionTimingFunction.ease),
