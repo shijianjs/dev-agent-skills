@@ -115,6 +115,12 @@ class Action : CustomElementAdapter() {
 `@emotion/serialize` + `stylis`（只声明用到的导出，不要写完整 wrapper）：
 
 ```kotlin
+// 自定义属性名各自一个具名常量：字符串只写一次，类型参数是 hook 承载的值类型
+private val cardBorderHook = CustomPropertyName<Color>("--ktjs-card-border")
+private val cardBackgroundHook = CustomPropertyName<Color>("--ktjs-card-bg")
+private val surfaceColorHook = CustomPropertyName<Color>("--ifm-background-surface-color")
+private val shadowHook = CustomPropertyName<BoxShadow>("--ktjs-shadow")
+
 private val cardClass = ClassName("ktjs-feature-card")   // 选择器也类型化，invoke 负责补点号
 // 一次性用可写 (ClassName("x")) { … }：不加括号会被当成「工厂调用 + 尾随 lambda」
 
@@ -124,22 +130,16 @@ private val rules: PropertiesBuilder = unsafeJso {
             1.px,
             LineStyle.solid,
             // var(name, fallback)：兜底值也是类型化的，不用手写 var(--x, rgba(…))
-            var(CustomPropertyName("--ktjs-card-border"), rgb(127, 127, 127, 0.24)),
+            var(cardBorderHook, rgb(127, 127, 127, 0.24)),
         )
-        backgroundColor = var(
-            CustomPropertyName("--ktjs-card-bg"),
-            var(CustomPropertyName("--ifm-background-surface-color"), NamedColor.white),
-        )
+        backgroundColor = var(cardBackgroundHook, var(surfaceColorHook, NamedColor.white))
         transition = many(                                                          // cssom 的多值拼接
             Transition(PropertyName.borderColor, 0.2.s, TransitionTimingFunction.ease),
             Transition(PropertyName.boxShadow, 0.2.s, TransitionTimingFunction.ease),
         )
         display = fallback(Display.grid, Display.flex)
         "&:hover" {
-            boxShadow = var(
-                CustomPropertyName("--ktjs-shadow"),
-                BoxShadow(0.px, 10.px, 24.px, rgb(31, 111, 235, 0.18)),
-            )
+            boxShadow = var(shadowHook, BoxShadow(0.px, 10.px, 24.px, rgb(31, 111, 235, 0.18)))
         }
     }
 }
