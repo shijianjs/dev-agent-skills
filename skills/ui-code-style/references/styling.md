@@ -116,6 +116,7 @@ class Action : CustomElementAdapter() {
 
 ```kotlin
 private val cardClass = ClassName("ktjs-feature-card")   // 选择器也类型化，invoke 负责补点号
+// 一次性用可写 (ClassName("x")) { … }：不加括号会被当成「工厂调用 + 尾随 lambda」
 
 private val rules: PropertiesBuilder = unsafeJso {
     cardClass {
