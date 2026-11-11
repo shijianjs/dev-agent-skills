@@ -149,7 +149,7 @@ private val SHEET: CSSStyleSheet = CSSStyleSheet().apply {
 收益不看行数，看**还剩多少 CSS 文本要手写**：同一段规则手写是 455 个字符的 CSS，上面只剩一条
 `transition` 简写（44 字符）+ 自定义属性名。三条实测约束：① 写 `&:hover`，`hover {}` 糖产出
 `:hover`，会被 stylis 当成**后代**选择器；② 多值简写（`transition`）仍要 `unsafeCast(String)`——
-`TransitionProperty` 生成代码只暴露 `all`；③ 不要用 `kotlin-css`（`kotlinx.css`）那套旧 DSL——值
+`TransitionProperty` 生成代码只暴露 `all`；`hover {}` 这条糖自带的选择器是 `:hover`、缺 `&`，只能手写；③ 不要用 `kotlin-css`（`kotlinx.css`）那套旧 DSL——值
 不做校验、`transition` 会补 `0s`、`&` 不解析。逐条 `insertRule` 灌 CSSOM 也不要：同一规则里
 `fallback()` 阶梯会被压成最后一条。
 
