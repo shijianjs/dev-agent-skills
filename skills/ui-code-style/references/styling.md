@@ -55,26 +55,55 @@ card.inlineStyle.apply {
 
 ## 2. 组件自己的小段 CSS
 
-只放内联表达不了的规则，并与组件同目录：
+只放内联表达不了的规则，并与组件同目录——一个组件一份，不合并成「首页样式表」：
 
 ```
 home/
-├── HomeHero.ts / KtjsHero.kt     # 组件 + 它自己的 CSS 常量
-├── HomeFeature.ts
-└── home.css                      # 只有真正共享的规则（reset、分区外壳、断点）
+├── Hero.ts        + hero.css          # 这个组件的规则 + 它自己的 sheet
+├── Features.ts    + features.css
+├── NextSteps.ts   + next-steps.css
+├── Section.ts     + section.css       # 两个分区共用的外壳（真共享）
+├── base.css                           # :host + box-sizing，所有组件都用
+└── styles.ts                          # ?inline 收集 + 惰性 sheet
 ```
 
-注入方式两种，效果等价（都进该组件的 shadow root）：
+注入方式是**一个组件类一份 `CSSStyleSheet`，该组件的所有实例 adopt 同一份**（Lit 的 `static styles`
+就是这个模型）。不要每个实例建 `<style>` 节点，也不要每个实例 `new CSSStyleSheet()`：规则是静态的，
+一份就够，实例多时差别是「一份解析」对「N 份文本 + N 次解析」。
 
-- TS：`const sheet = new CSSStyleSheet(); sheet.replaceSync(css); shadow.adoptedStyleSheets = [sheet]`
-  或 `shadow.append(Object.assign(document.createElement('style'), {textContent: css}))`。
-- Kotlin：`shadow.appendStyle(XXX_CSS)`（`ktjs-dom-kit`）。
+```ts
+// styles.ts：每份文件惰性建一次，导出取 sheet 的函数
+function lazySheet(css: string): () => CSSStyleSheet {
+  let sheet: CSSStyleSheet | null = null;
+  return () => {
+    if (!sheet) {
+      sheet = new CSSStyleSheet();
+      sheet.replaceSync(css);
+    }
+    return sheet;
+  };
+}
+export const heroStyles = lazySheet(heroCss);
+
+// 组件：共享 reset 在前，自己的规则在后
+const shadow = this.attachShadow({mode: 'open'});
+shadow.adoptedStyleSheets = [baseStyles(), heroStyles()];
+```
+
+```kotlin
+// 同文件：规则文本 + 模块级 sheet（Kotlin/JS 顶层 val 首次访问才初始化）
+private const val ACTION_CSS = """…"""
+private val ACTION_SHEET: CSSStyleSheet = CSSStyleSheet().apply { replaceSync(ACTION_CSS) }
+
+val shadow = attachStyledShadow(HOME_RESET, ACTION_SHEET)
+```
 
 类名只留给这些规则选中的节点。有了内联样式就不需要「每个节点一个语义 class」，多余 class 会让读者以为
 别处还有规则在用它。
 
-**共用一份 CSSStyleSheet 时要注意 SSR**：`CSSStyleSheet` 在 Node 里不存在，模块级 `new CSSStyleSheet()`
-会让预渲染直接崩。惰性创建（第一次进构造函数时建），或保证该模块只在浏览器侧被求值。
+**惰性创建是 SSR 的要求**：`CSSStyleSheet` 在 Node 里不存在，模块级 `new CSSStyleSheet()` 会让预渲染
+直接崩。上面两种写法都是第一次用到才建（Kotlin/JS 的顶层 `val` 本身也是惰性初始化，但只在浏览器侧
+被求值的模块里才安全）。
 
 ## 3. 内联与状态的冲突（最容易做错）
 
@@ -89,12 +118,16 @@ run.style.backgroundColor = 'var(--accent)';
 
 - **被 `:hover` / `:focus-visible` / `[aria-pressed]` 改变的属性**（背景、边框色、字色、阴影）
   → 连同它们的 base 值、`transition` 一起写在组件 CSS 里。
+- **被 `@media` 改变的属性**（窄屏换成的 `padding`、`flex-direction`）同理：内联会让断点失效。
+  要么这组属性留在 CSS，要么改写成 `clamp()` 之类的流式值、把断点整段删掉——后者更省事。
 - **不会被状态改变的布局属性**（`display`、`gap`、`padding`、`border-radius`、字号）
   → 内联。
 - **简写与长写**：内联 `border` / `margin` / `padding` 会同时写死各长写属性，CSS 里的
   `border-color` / `margin-top` 就盖不住。要么整组留在 CSS，要么整组内联，不要一半一半。
 - **`@supports` 守卫的增强**（例如 `background-clip: text` 的渐变标题）留在 CSS：内联没法条件降级，
   而内联的 `color` 又会压住 CSS 里的 `color: transparent`。
+- **`:host` 自身**：自定义元素的 `display` 不能从构造函数写（给 `this` 加属性会让
+  `document.createElement` 抛错），所以 `:host { display: block }` 只能落在共享 reset 里。
 
 ## 4. 从集中式 CSS 拆回去（迁移步骤）
 

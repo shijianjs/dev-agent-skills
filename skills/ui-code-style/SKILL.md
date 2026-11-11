@@ -98,25 +98,32 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/文件按
   是否存在**真实业务复用与共同变化关系**。
 - **绝不生成集中式大字符串**：把几十上百行 CSS 堆进一个常量、再由各组件按 class 取用，等于把每个组件
   的私有样式挪进公共文件——这不是共享，只是搬运。评审看到几百行 CSS 常量就是违规。
-- **`adoptedStyleSheets` 不是默认写法**：它是共享机制。只有真有一份样式要服务多个组件时（reset、
-  主题、父容器布局）才用；不要「每个组件一份 sheet」当作组织方式。
+- **`adoptedStyleSheets` 是共享机制，但要看清共享的粒度**。第二级那部分规则**写成该组件类的一份
+  `CSSStyleSheet`**（模块级常量，或惰性建一次），由该组件的**所有实例** adopt —— 这就是 Lit
+  `static styles` 的做法。**绝不要每个实例建一个 `<style>` 节点**：规则是静态的，一份 sheet 已经够用，
+  每实例一份只是把同样的文本与解析开销乘以节点数（20×20 的空格、几十张卡片尤其明显）。再上一级才是
+  跨组件共享（reset、主题 token、父容器布局）。
 - **默认用 shadow root**：宿主全局 CSS 进不来、组件 CSS 漏不出去，不靠人工命名空间防污染。主题靠
   **继承的自定义属性**穿过边界（`var(--ifm-*)` / `var(--品牌-*)`），组件里不写 `[data-theme]` 选择器。
   只有必须复用宿主 light DOM 规则时才退回 light DOM，并说清依赖了哪条规则。
-- **`box-sizing` 要在 shadow 作用域里重新声明**：它不是继承属性，宿主的 `* { box-sizing: border-box }`
-  选不进来，带 padding 的盒子会按 content-box 算、布局阈值随之移位。这是少数「真的共享」的场景。
+- **`:host` 的 `display` 与 `box-sizing` 只能写在 sheet 里**：自定义元素默认 `display: inline`，而构造
+  函数里给 `this` 设 `style` 会加属性、让 `document.createElement(tag)` 抛错；`box-sizing` 不是继承属性，
+  宿主的 `* { box-sizing: border-box }` 选不进来，带 padding 的盒子会按 content-box 算、布局阈值随之移位。
+  两个都放进所有组件共用的那份 reset sheet。
 
 ## 四、内联 vs CSS：必须知道的边界
 
 内联能做的：直接设置属性、动态修改、CSS 变量。内联**做不到**：伪类、伪元素、媒体查询、后代选择器、
 `@keyframes`。
 
-两条由此而来的硬约束：
+三条由此而来的硬约束：
 
 1. **会被状态覆盖的属性必须留在 CSS 里**。元素上写了内联 `background-color`，`:hover` 的
    `background-color` 就永远不生效（内联优先级更高）。所以「hover 会变的那些属性 + 它们的 base 值 +
    `transition`」一起放进该组件的小段 CSS，其余布局仍内联。
-2. **简写与长写不要分家**。内联 `border` 会把 `border-color` 一起写死，CSS 里的 `border-color`
+2. **被 `@media` 覆盖的属性同理不能内联**。写在内联里的 `padding` 会让断点里的 `padding` 失效——要么
+   那组属性留在 CSS，要么改写成 `clamp()` 之类的流式值后彻底删掉断点。
+3. **简写与长写不要分家**。内联 `border` 会把 `border-color` 一起写死，CSS 里的 `border-color`
    就盖不住它——要么整组留在 CSS，要么整组内联。
 
 能用 CSS 函数表达的别升级成媒体查询：`clamp()` / `min()` / `max()` / `calc()` 往往一条内联就够
@@ -148,8 +155,8 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/文件按
 | --- | --- | --- |
 | 建节点 | `el('img', {class, alt, width})`（按标签收窄的 helper）；需要反复访问的节点存字段 | `TagName<T>.createElement { … }`；自定义元素继承 element adapter 基类 |
 | 内联样式 | `node.style.padding = '1.5rem'` | `inlineStyle.apply { padding = 1.5.rem }`（类型化视图：`Display.flex`、`Padding(...)`、`Color("var(--x, …)")`） |
-| 组件内小段 CSS | 组件目录里的 `.css` + `?inline` 注入 shadow root | 同文件里的 `private const val X_CSS` + `shadow.appendStyle(X_CSS)` |
-| 共享样式 | 共享入口的 sheet（惰性创建，Node 求值时不碰 `CSSStyleSheet`） | 共享常量 sheet + `attachStyledShadow(sheet)` |
+| 组件自己的 sheet | 组件目录里的 `.css` + `?inline`，惰性 `new CSSStyleSheet()`，所有实例 adopt 同一份 | 同文件里的 `private const val X_CSS` + 模块级 `private val X_SHEET`，`attachStyledShadow(RESET, X_SHEET)` |
+| 跨组件共享样式 | 共享入口的 sheet（惰性创建，Node 求值时不碰 `CSSStyleSheet`） | 共享常量 sheet，同样交给 `attachStyledShadow` |
 | 生命周期 | `constructor()` 建树 + `attachShadow()` | 构造函数/`init` 建树；注意编译产物差异 |
 
 ## 八、评审清单
@@ -160,9 +167,10 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/文件按
 - [ ] 新组件没有引入 render/rebuild 式刷新；状态变化只改相关节点。
 - [ ] 没有 `innerHTML` 拼标记；需要反复访问的节点有字段。
 - [ ] 每个元素的样式在它自己的代码旁；没有几百行的集中式 CSS 常量。
-- [ ] 被 `:hover` / `:focus-visible` 覆盖的属性没有写在内联里。
-- [ ] 没有为「每个组件一份」用 `adoptedStyleSheets`；共享 sheet 里只有真正共享的规则。
-- [ ] shadow 树里重新声明了 `box-sizing`；组件里没有 `[data-theme]` 选择器。
+- [ ] 是「一个组件类一份 sheet」——所有实例 adopt 同一份，没有每个实例建 `<style>` 或新建 sheet。
+- [ ] 被 `:hover` / `:focus-visible` / `@media` 覆盖的属性没有写在内联里。
+- [ ] 共享 sheet 里只有真正必须一起变的规则（reset、主题、父容器布局）。
+- [ ] shadow 树里重新声明了 `box-sizing` 与 `:host { display: block }`；组件里没有 `[data-theme]` 选择器。
 - [ ] 图标走 `iconify-icon`，尺寸用 `font-size`。
 - [ ] 框架管理的子节点没被删；注册脚本在 hydration 之后。
 - [ ] 流式尺寸优先用 `clamp()` / `min()` / `max()`，而不是堆断点。
@@ -173,7 +181,8 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/文件按
 - 禁止 React / Vue / Lit 式状态驱动重渲染，以及任何 `render()` / `rebuild()` / `update(all)` 通用刷新入口。
 - 禁止 `innerHTML` / `insertAdjacentHTML` / 模板字符串拼标记。
 - 禁止把多个组件的样式集中到一个大字符串或一个公共 CSS 文件。
-- 禁止默认使用 `adoptedStyleSheets`、CSS-in-JS、CSS DSL 或为少量样式引入额外依赖。
+- 禁止每个组件实例建 `<style>` 节点或新 `CSSStyleSheet`（静态规则本来就只需要一份）。
+- 禁止 CSS-in-JS、CSS DSL、为少量样式引入额外依赖。
 - 禁止为了「可复用」提前抽取：没有两个以上必须一起变的调用方就不要提取。
 - 禁止在构造函数里给自定义元素的 `this` 加属性或子节点。
 - 禁止自研图标/ SVG 封装。
