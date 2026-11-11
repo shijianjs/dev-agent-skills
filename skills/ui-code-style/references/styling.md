@@ -130,7 +130,10 @@ private val rules: PropertiesBuilder = unsafeJso {
             CustomPropertyName("--ktjs-card-bg"),
             var(CustomPropertyName("--ifm-background-surface-color"), Color("#fff")),
         )
-        transition = unsafeCast("border-color 0.2s ease, box-shadow 0.2s ease")   // 唯一残留的字符串
+        transition = many(                                                          // cssom 的多值拼接
+            Transition(transitionProperty("border-color"), 0.2.s, TransitionTimingFunction.ease),
+            Transition(transitionProperty("box-shadow"), 0.2.s, TransitionTimingFunction.ease),
+        )
         display = fallback(Display.grid, Display.flex)
         "&:hover" {
             boxShadow = var(
@@ -149,12 +152,13 @@ private val SHEET: CSSStyleSheet = CSSStyleSheet().apply {
 }
 ```
 
-收益不看行数，看**还剩多少 CSS 文本要手写**：同一段规则手写是 455 个字符的 CSS，上面只剩一条
-`transition` 简写（44 字符）+ 自定义属性名。三条实测约束：① 写 `&:hover`，`hover {}` 糖产出
-`:hover`，会被 stylis 当成**后代**选择器；② 多值简写（`transition`）仍要 `unsafeCast(String)`——
-`TransitionProperty` 生成代码只暴露 `all`；`hover {}` 这条糖自带的选择器是 `:hover`、缺 `&`（上游缺陷，已被报为 JetBrains/kotlin-wrappers#2933），只能手写 `"&:hover"`；③ 不要用 `kotlin-css`（`kotlinx.css`）那套旧 DSL——值
-不做校验、`transition` 会补 `0s`、`&` 不解析。逐条 `insertRule` 灌 CSSOM 也不要：同一规则里
-`fallback()` 阶梯会被压成最后一条。
+收益不看行数，看**还剩多少 CSS 文本要手写**：同一段规则手写是 455 个字符的 CSS，上面一条声明也
+不用手写，只剩名字（过渡属性名、自定义属性名）。三条实测约束：① 写 `"&:hover"`——`hover {}` 糖自带
+的选择器是 `:hover`、缺 `&`，会被 stylis 当成**后代**选择器（上游缺陷，已报
+JetBrains/kotlin-wrappers#2933）；② `TransitionProperty` 的生成代码只暴露 `all`，过渡属性名仍需一个
+`unsafeCast`，封装成一行 `transitionProperty(name)`、别扩散到整条声明；③ 不要用 `kotlin-css`
+（`kotlinx.css`）那套旧 DSL——值不做校验、`transition` 会补 `0s`、`&` 不解析。逐条 `insertRule` 灌
+CSSOM 也不要：同一规则里 `fallback()` 阶梯会被压成最后一条。
 
 类名只留给这些规则选中的节点。有了内联样式就不需要「每个节点一个语义 class」，多余 class 会让读者以为
 别处还有规则在用它。
