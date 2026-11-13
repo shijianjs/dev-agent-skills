@@ -24,7 +24,7 @@ npx skills add shijianjs/dev-agent-skills --list
 | [ktjs-type-mapping](skills/ktjs-type-mapping/SKILL.md) | 把上游 npm 包的 TypeScript 声明翻译成 Kotlin/JS `external` 声明时的建模规范（kotlin-wrappers 风格），供 `ktjs-*` 各 wrapper 仓库共用。 |
 | [long-task-tracking](skills/long-task-tracking/SKILL.md) | 为跨多个 AI 对话上下文的长期 Git 开发任务建立和维护持久化进度清单，确保任务范围、完成状态、排除事项和后续工作可以准确恢复。 |
 | [intellij-mcp-plugins](skills/intellij-mcp-plugins/SKILL.md) | 用脚本或命令行调用 IntelliJ IDEA 的 MCP server，查类型继承树（父类链 + 子实现）、实现列表与覆盖方法（Java / Kotlin/JVM / Kotlin/JS），含通用 MCP 客户端与继承树渲染脚本。 |
-| [ui-code-style](skills/ui-code-style/SKILL.md) | 原生 DOM 写 UI 的组织与样式规范：按业务语义切分（可递归）而非技术类型、保留模式而非 state→render、样式优先内联且 CSS 不堆成大字符串、`adoptedStyleSheets` 只给真正共享、图标用 `iconify-icon`；含 TS 与 Kotlin/JS 两套落地写法。 |
+| [ui-code-style](skills/ui-code-style/SKILL.md) | 原生 DOM 写 UI 的组织与样式规范：目录/包/文件按业务语义切分（可递归）而非技术类型、保留模式而非 state→render、样式优先内联且 CSS 不堆成大字符串、`adoptedStyleSheets` 只给真正共享、图标用 `iconify-icon`；含 TS 与 Kotlin/JS 两套落地写法。 |
 
 ## 仓库结构
 
