@@ -106,7 +106,8 @@ Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，两条都会炸（2
 | --- | --- | --- |
 | 建节点 | `el('a', {class, href})`（按标签收窄，方法/对象属性进不来） | `TagName<T>.createElement { … }` |
 | 自定义元素基类 | `HTMLElementBase`（Node 下回退空类），或直接 `HTMLElement`（若从不进 Node） | element adapter 基类 + 注册时剥桥 |
-| 样式 | `node.style.x = …` / 组件目录里的 `.css`（`?inline`） | `inlineStyle.apply { … }` / 同文件的 `X_CSS` + 模块级 `X_SHEET` |
+| 样式（静态） | 组件目录里的 `.css`（`?inline`）+ 语义 class | 同文件的 `X_CSS` / `cssSheet { … }` + 模块级 `X_SHEET`，节点只带 class |
+| 样式（动态值） | 只对需要的那一个属性 `node.style.x = …` | 只对需要的那一个属性 `inlineStyle.apply { … }`，能换 class 切换的不要内联 |
 | 注入 | `shadow.adoptedStyleSheets = [baseStyles(), ownStyles()]`（一个类一份，惰性建） | `attachStyledShadow(RESET, X_SHEET)`（顶层 `val` 首次访问才建） |
 | 生命周期 | 方法覆写 | `@JsName` 方法，`override fun connectedCallback()` |
 | 注册 | `customElements.define(name, Class)`，包一层 `defineIfMissing` 便于重复 import | 同上；名字用 `TagName` 常量持有 |

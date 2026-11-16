@@ -1,6 +1,6 @@
 ---
 name: ui-code-style
-description: 用原生 DOM 写 UI 时的组织与样式规范：目录/包/文件按业务语义切分而不是按技术类型（禁止 css/、utils/ 这种技术分类目录），组件用「保留模式」而不是 state→render，样式优先内联（element.style），只有 :hover / 伪元素 / 媒体查询这类内联表达不了的才写组件自己的小段 CSS、不堆成集中式大字符串，adoptedStyleSheets 只给真正共享的东西，图标用官方 iconify-icon。新增或评审 UI 组件、拆分目录、决定某段样式放哪、把页面拆成组件、被要求「统一管理 CSS」「用 CSS-in-JS」时使用；具体项目文档更严格时以项目为准。
+description: 用原生 DOM 写 UI 时的组织与样式规范：目录/包/文件按业务语义切分而不是按技术类型（禁止 css/、utils/ 这种技术分类目录），组件用「保留模式」而不是 state→render，样式以组件自己的一份静态 CSSStyleSheet + class 为主（一份规则被所有同类节点共用，而不是每个节点背一份 style），只有运行时才确定、会频繁变的少数值才内联（这是性能妥协，越少越好），sheet 与组件同处、作用域限制在组件内，adoptedStyleSheets 只给真正共享的东西，图标用官方 iconify-icon。新增或评审 UI 组件、拆分目录、决定某段样式放哪、把页面拆成组件、被要求「统一管理 CSS」「用 CSS-in-JS」时使用；具体项目文档更严格时以项目为准。
 ---
 
 # UI 代码风格
@@ -10,14 +10,15 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/包/文�
 
 1. **按业务归属切分**，技术类型只是业务模块内部的次级文件。
 2. **组件是一群长期存在的 DOM 节点**，不是 state 的函数。
-3. **样式是组件的私有属性**：默认内联，只有内联表达不了才写 CSS，只有真正共享才提取。
+3. **样式是组件的私有属性**：静态规则进组件自己的一份 sheet、节点只带语义 class；只有运行时才定得下来、
+   并且会频繁变的少数值才内联；只有真正共享才提取。
 
 动手前先答三个问题，答案决定文件放哪、代码怎么写、样式写在哪：
 
 | 问题 | 判定 |
 | --- | --- |
 | 这个东西属于哪个业务？ | 决定它放进哪个文件夹（以及是否根本不该单独成文件） |
-| 这段样式能被一条普通声明表达吗？ | 能 → 内联；不能 → 该组件自己的小段 CSS |
+| 这个值是不是运行时才定得下来？ | 会、而且会频繁变 → 内联（性能妥协，越少越好）；静态 → 组件自己的 sheet + class |
 | 这段样式有两个以上组件必须一起变吗？ | 是 → 共享（reset / 主题 token / 父容器布局）；否 → 谁也不给 |
 
 机制细节分别见 `references/packages.md`（包划分判据、什么时候才该开子包）、
@@ -86,50 +87,71 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/包/文�
 - **一个业务一个 class，没有组件基类**：不做 `create()` / `apply()` 式模板方法抽象——那会把通用刷新
   重新引进来。函数只留给纯工具。
 
-## 三、样式：三级阶梯，能升一级就不升两级
+## 三、样式：静态进组件 sheet，内联只留给动态值
 
 | 层级 | 放什么 | 怎么落 |
 | --- | --- | --- |
-| 1. 内联 | 一条普通声明能表达的一切：盒模型、间距、字体、颜色、圆角、网格 | `el.style.* = …`，有类型库就用类型化 API |
-| 2. 该组件自己的小段 CSS | 内联表达不了的：`:hover` / `:focus-visible`、`::before` / `::after`、`@media`、`@supports`、`@keyframes`、后代选择器 | 与组件同一个文件（同一目录），只注入该组件自己的 shadow root |
+| 1. 组件自己的静态 sheet（**默认**） | 一切静态规则：盒模型、间距、字体、颜色、圆角、网格，以及 `:hover` / `:focus-visible`、`::before` / `::after`、`@media`、`@supports`、`@keyframes`、后代选择器 | 与组件同一个文件（同一目录）的一份 `CSSStyleSheet`，该组件的所有节点共用；节点只带语义 class |
+| 2. 内联（例外，性能妥协） | 只有运行时才定得下来、并且会频繁变的值：拖拽/滚动位置、进度条宽度、用户挑的颜色、第三方库要求直接写 `style` 的尺寸 | `el.style.* = …`，有类型库就用类型化 API；先问一句「它能不能变成 class 切换」 |
 | 3. 真正共享的样式表 | reset、主题 token、父容器对子组件的统一布局、多个组件必须一起变的视觉 | 独立的共享入口，跨组件复用 |
+
+**为什么默认是 class + sheet 而不是内联**：样式与 DOM 实例是**一对多**的。同样的「padding / 边框 / 字号」
+会出现在几十个同类节点上，内联意味着每个节点各自背一份 `style` 属性字符串——N 份重复文本、N 次解析、
+N 个需要参与样式重算的内联声明，改一个值还要改 N 处代码。走 class 则是：节点上只多几十字节的 token，
+一份规则被所有同类节点共用，改一处全部生效。内联样式表还有额外代价：它会盖掉任何选择器规则（见第四节），
+也不参与「同一份规则被复用」这件事。
 
 判定与纪律：
 
-- **样式写在渲染它的那段代码旁边**。一个元素的样式与它的 DOM 结构、行为逻辑应在同一处：改一处不用读两处。
-- **不主动抽取**，不为「代码行数 / 文件数量 / 看起来整齐」拆分。两处属性相同不等于该提取；判断标准是
-  是否存在**真实业务复用与共同变化关系**。默认落点因此是「私有」，把共享当成一次要说明理由的升级——详见 `references/styling.md` 第 6 节。
+- **静态就走 class**。位置、尺寸、间距、字体、颜色、圆角、边框、网格——只要值不依赖运行时数据，就进 sheet。
+- **内联是明确的性能妥协，必须「少」**。允许的只有「值在运行时才知道」这一种情况；而且只写**那一个属性**，
+  不要顺手把整块样式一起内联（那就是本文开头说的那种 N 份重复）。
+- **两态/多态先想 class**。常态/选中态、可用/不可用、成功/失败——这些是有限枚举，用 class 切换（
+  `.row.is-selected`、`.badge.badge-muted`），不要内联颜色。只有值连续、无法枚举时才内联。
+- **动态值优先走 CSS 自定义属性**：`el.style.setProperty('--progress', '42%')` 一个属性就够了，sheet 里
+  `width: var(--progress)` 那条规则仍然是静态的，还能被其它规则复用。
+- **就近原则照旧**：规则写在渲染它的那段代码旁边，一个组件一份 sheet；改一处不用读两处。不为了「整齐」
+  搬到某个公共样式表里。
+- **作用域限制在组件内**，只有真正共享才升到全局：shadow root 时靠边界隔离；light DOM 时规则用组件的
+  根 class 做前缀（`.browser .cell`）或组件专属 class 命名（`.class-table-cell`），不写裸标签选择器和
+  会误伤别人的全局 class。
+- **不主动抽取**，不为「代码行数 / 文件数量 / 看起来整齐」拆分。判断标准是是否存在**真实业务复用与共同
+  变化关系**；默认落点是「这个组件自己」，把共享当成一次要说明理由的升级——详见 `references/styling.md` 第 6 节。
 - **绝不生成集中式大字符串**：把几十上百行 CSS 堆进一个常量、再由各组件按 class 取用，等于把每个组件
   的私有样式挪进公共文件——这不是共享，只是搬运。评审看到几百行 CSS 常量就是违规。
-- **`adoptedStyleSheets` 是共享机制，但要看清共享的粒度**。第二级那部分规则**写成该组件类的一份
-  `CSSStyleSheet`**（模块级常量，或惰性建一次），由该组件的**所有实例** adopt —— 这就是 Lit
-  `static styles` 的做法。**绝不要每个实例建一个 `<style>` 节点**：规则是静态的，一份 sheet 已经够用，
-  每实例一份只是把同样的文本与解析开销乘以节点数（20×20 的空格、几十张卡片尤其明显）。再上一级才是
-  跨组件共享（reset、主题 token、父容器布局）。
+- **`adoptedStyleSheets` 是正常机制，不是只给共享用的**。组件自己的那份规则**写成该组件类（或该页面
+  模块）的一份 `CSSStyleSheet`**（模块级常量，或惰性建一次），**所有同类节点 adopt 同一份**——这就是
+  Lit `static styles` 的做法。**绝不要每个实例建一个 `<style>` 节点**：规则是静态的，一份 sheet 已经够用，
+  每实例一份只是把同样的文本与解析开销乘以节点数。再上一级才是跨组件共享（reset、主题 token、父容器布局）。
 - **默认用 shadow root**：宿主全局 CSS 进不来、组件 CSS 漏不出去，不靠人工命名空间防污染。主题靠
   **继承的自定义属性**穿过边界（`var(--ifm-*)` / `var(--品牌-*)`），组件里不写 `[data-theme]` 选择器。
-  只有必须复用宿主 light DOM 规则时才退回 light DOM，并说清依赖了哪条规则。
+  只有必须复用宿主 light DOM 规则时才退回 light DOM，并说清依赖了哪条规则；这时「作用域靠根 class 前缀」
+  那条就是隔离手段。
 - **`:host` 的 `display` 与 `box-sizing` 只能写在 sheet 里**：自定义元素默认 `display: inline`，而构造
   函数里给 `this` 设 `style` 会加属性、让 `document.createElement(tag)` 抛错；`box-sizing` 不是继承属性，
   宿主的 `* { box-sizing: border-box }` 选不进来，带 padding 的盒子会按 content-box 算、布局阈值随之移位。
   两个都放进所有组件共用的那份 reset sheet。
 
-## 四、内联 vs CSS：必须知道的边界
+## 四、内联 vs sheet：边界与例外
 
-内联能做的：直接设置属性、动态修改、CSS 变量。内联**做不到**：伪类、伪元素、媒体查询、后代选择器、
-`@keyframes`。
+内联**做不到**：伪类、伪元素、媒体查询、后代选择器、`@keyframes`。这本身就把交互态与响应式挡在了 sheet 里。
 
-三条由此而来的硬约束：
+即便写得出来，静态声明也优先进 sheet——理由是第三节那条一对多：内联是逐节点各存一份，sheet 是一份规则
+被所有节点共用。内联留给「运行时才知道的值」，并且**只写那几个属性**。
 
-1. **会被状态覆盖的属性必须留在 CSS 里**。元素上写了内联 `background-color`，`:hover` 的
-   `background-color` 就永远不生效（内联优先级更高）。所以「hover 会变的那些属性 + 它们的 base 值 +
-   `transition`」一起放进该组件的小段 CSS，其余布局仍内联。
-2. **被 `@media` 覆盖的属性同理不能内联**。写在内联里的 `padding` 会让断点里的 `padding` 失效——要么
-   那组属性留在 CSS，要么改写成 `clamp()` 之类的流式值后彻底删掉断点。
-3. **简写与长写不要分家**。内联 `border` 会把 `border-color` 一起写死，CSS 里的 `border-color`
-   就盖不住它——要么整组留在 CSS，要么整组内联。
+四条由此而来的硬约束：
 
-能用 CSS 函数表达的别升级成媒体查询：`clamp()` / `min()` / `max()` / `calc()` 往往一条内联就够
+1. **会被状态覆盖的属性必须在 sheet 里**。元素上写了内联 `background-color`，`:hover` 的
+   `background-color` 就永远不生效（内联优先级更高）。「hover/focus 会变的属性 + 它们的 base 值 +
+   `transition`」整组放 sheet。
+2. **被 `@media` 覆盖的属性同理不能内联**。内联里的 `padding` 会让断点里的 `padding` 失效——要么
+   那组属性留在 sheet，要么改写成 `clamp()` 之类的流式值后彻底删掉断点。
+3. **简写与长写不要分家**。sheet 里写 `border-color`、元素上又内联 `border`，长写就盖不住——要么整组留在
+   sheet，要么整组内联（后者只在值动态时才考虑）。
+4. **内联只用 `style` 的逐属性赋值，不用 `cssText` / 整段字符串**。`cssText` 一次覆盖整份 style，既绕开
+   类型检查，也让「哪些是动态的」这条边界消失。
+
+能用 CSS 函数表达的别升级成媒体查询：`clamp()` / `min()` / `max()` / `calc()` 往往一条声明就够
 （流式间距比断点更平滑）。真的需要断点时才写 `@media`。
 
 ## 五、页面与框架边界
@@ -157,8 +179,8 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/包/文�
 | | TypeScript + 原生 DOM | Kotlin/JS |
 | --- | --- | --- |
 | 建节点 | `el('img', {class, alt, width})`（按标签收窄的 helper）；需要反复访问的节点存字段 | `TagName<T>.createElement { … }`；自定义元素继承 element adapter 基类 |
-| 内联样式 | `node.style.padding = '1.5rem'` | `inlineStyle.apply { padding = 1.5.rem }`（类型化视图：`Display.flex`、`Padding(...)`、`Color("var(--x, …)")`） |
-| 组件自己的 sheet | 组件目录里的 `.css` + `?inline`，惰性 `new CSSStyleSheet()`，所有实例 adopt 同一份 | 同文件里的 `private const val X_CSS` + 模块级 `private val X_SHEET`，`attachStyledShadow(RESET, X_SHEET)` |
+| 静态规则（默认） | 组件目录里的 `.css` + `?inline`，惰性 `new CSSStyleSheet()`，注入该组件的 shadow root | 同文件里的 `cssSheet { … }`（`ktjs-dom-kit`，类型化 + emotion/stylis 序列化）或 `private const val X_CSS`，模块级 `private val X_SHEET`，`attachStyledShadow(RESET, X_SHEET)`；没有 shadow root 时由页面统一 adopt |
+| 动态值（例外） | 只对需要的那一个属性 `node.style.* = …`，或 `setProperty('--x', …)` 交给 sheet 用 | `inlineStyle.apply { width = … }` 只写动态属性；能变成 class 切换的就不要内联 |
 | 跨组件共享样式 | 共享入口的 sheet（惰性创建，Node 求值时不碰 `CSSStyleSheet`） | 共享常量 sheet，同样交给 `attachStyledShadow` |
 | 生命周期 | `constructor()` 建树 + `attachShadow()` | 构造函数/`init` 建树；注意编译产物差异 |
 
@@ -170,9 +192,12 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/包/文�
 - [ ] 新开的包/子包回答的是「属于谁」而不是「按类型 / 实现分」；没有明确的父子级或一对多关系就不分层。
 - [ ] 新组件没有引入 render/rebuild 式刷新；状态变化只改相关节点。
 - [ ] 没有 `innerHTML` 拼标记；需要反复访问的节点有字段。
-- [ ] 每个元素的样式在它自己的代码旁；没有几百行的集中式 CSS 常量。
+- [ ] 每个元素的静态样式都在它自己的组件 sheet 里，节点只带语义 class；没有逐节点重复的 `style=`。
+- [ ] 内联只剩运行时才确定的值（通常个位数），没有把整块样式顺手内联进去。
+- [ ] 两态/多态（选中、可用、成功/失败）用 class 切换，不是内联颜色。
 - [ ] 是「一个组件类一份 sheet」——所有实例 adopt 同一份，没有每个实例建 `<style>` 或新建 sheet。
 - [ ] 被 `:hover` / `:focus-visible` / `@media` 覆盖的属性没有写在内联里。
+- [ ] 组件 sheet 的规则作用域限制在该组件（根 class 前缀或专属 class 名），没有裸标签选择器与全局 class。
 - [ ] 共享 sheet 里只有真正必须一起变的规则（reset、主题、父容器布局）。
 - [ ] shadow 树里重新声明了 `box-sizing` 与 `:host { display: block }`；组件里没有 `[data-theme]` 选择器。
 - [ ] 图标走 `iconify-icon`，尺寸用 `font-size`。
@@ -185,6 +210,8 @@ description: 用原生 DOM 写 UI 时的组织与样式规范：目录/包/文�
 - 禁止 React / Vue / Lit 式状态驱动重渲染，以及任何 `render()` / `rebuild()` / `update(all)` 通用刷新入口。
 - 禁止 `innerHTML` / `insertAdjacentHTML` / 模板字符串拼标记。
 - 禁止把多个组件的样式集中到一个大字符串或一个公共 CSS 文件。
+- 禁止把静态样式写成逐节点内联（同一条声明在 N 个节点上重复 N 份：文本、解析、重算都翻 N 倍）。
+- 禁止用内联去表达有限枚举的状态（选中/可用/成功失败一律 class 切换）。
 - 禁止每个组件实例建 `<style>` 节点或新 `CSSStyleSheet`（静态规则本来就只需要一份）。
 - 禁止为了「少写几行」引入运行时注入式的 CSS-in-JS（把样式塞进 `document` 的 `<style>`）：它绕不开
   shadow root 的隔离。**类型化的 CSS DSL 不在此列**——用类型约束属性名、把「魔法字符串」压到只剩值层面，
