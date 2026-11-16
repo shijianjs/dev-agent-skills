@@ -182,7 +182,7 @@ N 个需要参与样式重算的内联声明，改一个值还要改 N 处代码
 | 静态规则（默认） | 组件目录里的 `.css` + `?inline`，惰性 `new CSSStyleSheet()`，注入该组件的 shadow root | 同文件里的 `cssSheet { … }`（`ktjs-dom-kit`，类型化 + emotion/stylis 序列化）或 `private const val X_CSS`，模块级 `private val X_SHEET`，`attachStyledShadow(RESET, X_SHEET)`；没有 shadow root 时由页面统一 adopt |
 | 动态值（例外） | 只对需要的那一个属性 `node.style.* = …`，或 `setProperty('--x', …)` 交给 sheet 用 | `inlineStyle.apply { width = … }` 只写动态属性；能变成 class 切换的就不要内联 |
 | 跨组件共享样式 | 共享入口的 sheet（惰性创建，Node 求值时不碰 `CSSStyleSheet`） | 共享常量 sheet，同样交给 `attachStyledShadow` |
-| 生命周期 | `constructor()` 建树 + `attachShadow()` | 构造函数/`init` 建树；注意编译产物差异 |
+| 生命周期 | `constructor()` 建树 + `attachShadow()` | 构造函数/`init` 建树；**js target 必须 `compilerOptions { target = "es2015" }`**，ES5 下元素不会升级（见 `references/elements.md` 第 4 节） |
 
 ## 八、评审清单
 
@@ -200,6 +200,8 @@ N 个需要参与样式重算的内联声明，改一个值还要改 N 处代码
 - [ ] 组件 sheet 的规则作用域限制在该组件（根 class 前缀或专属 class 名），没有裸标签选择器与全局 class。
 - [ ] 共享 sheet 里只有真正必须一起变的规则（reset、主题、父容器布局）。
 - [ ] shadow 树里重新声明了 `box-sizing` 与 `:host { display: block }`；组件里没有 `[data-theme]` 选择器。
+- [ ] Kotlin/JS 项目在 js target 上设了 `target = "es2015"`；产物里 `grep 'HTMLElement.call'` 为 0——否则元素
+      能定义但永不升级，页面看着像「样式全没生效」。
 - [ ] 图标走 `iconify-icon`，尺寸用 `font-size`。
 - [ ] 框架管理的子节点没被删；注册脚本在 hydration 之后。
 - [ ] 流式尺寸优先用 `clamp()` / `min()` / `max()`，而不是堆断点。
