@@ -74,9 +74,9 @@ class XCard extends HTMLElementBase {
   `removeAttribute`，免得浏览器把同一段文案再画成 tooltip。
 - 新增内容形态 = 新增一个 setter，不要回头引入 `setData()` / `update()`。
 
-## 4. Kotlin/JS：两个必须绕开的编译产物问题
+## 4. Kotlin/JS：三个必须绕开的编译产物问题
 
-Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，两条都会炸（2026-11 在 Kotlin 2.4.21 实测）：
+Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，前两条都会炸（2026-11 在 Kotlin 2.4.21 实测）：
 
 1. **目标级别低于 ES2015 时**，`class X : HTMLElement()` 编译成
    `function X() { HTMLElement.call(this); }`，DOM 构造函数只接受 `new`，浏览器抛
@@ -89,6 +89,13 @@ Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，两条都会炸（2
 
    回调里第一句调 `querySelector` 就 `Maximum call stack size exceeded`。同时官方写法
    （`override val connectedCallback`）编译成 getter，浏览器只认方法，回调静默不执行。
+
+3. **跨模块构造器的默认参数不要用函数字面量**：development 与 production 是两次独立编译，同一个
+   构造器会算出**不同的混淆名**——库那侧只编译一次、导出 `new_…_imfsn8_k$`，development executable
+   里却调用 `Entry.new_…_28n0j_k$`，于是 `jsBrowserDevelopmentRun` 白屏并抛
+   `Uncaught TypeError: …new_…_k$ is not a function`（production bundle 反而是对的，e2e 全绿也照样
+   会漏）。规矩：公开构造器的默认值只用常量（`null` / `0` / `""`），函数类型参数要么必填、要么默认
+   `null` 由调用方 `?.invoke`。所以 **dev 产物也要单独验收一次**，别只跑 production 的 e2e。
 
 因此用「适配基类 + 注册前剥桥」的固定做法，不要在元素类里手写转发：
 
