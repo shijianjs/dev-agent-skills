@@ -129,6 +129,21 @@ Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，前两条都会炸�
 - 只在 Node 求值的包**不要** import 定义元素的模块：顶层 `class X extends HTMLElement` 会在 Node 求值时
   炸。把浏览器专属代码单独一个入口，由浏览器包加载。
 
+### 由祖先切换显隐的 `<iconify-icon>` 要带 `noobserver`
+
+`iconify-icon` 用 IntersectionObserver 决定要不要保留自己 shadow 里的 `<svg>`：判定不可见就删掉，
+但 `status` 仍然是 `rendered`；它断连时又把 `_visible` 复位成 `true`。净效果是一个死循环——
+
+1. 菜单/抽屉/折叠分组关掉 → 子项不可见 → `<svg>` 被删；
+2. 元素断连 → `_visible` 回到 `true`；
+3. 再打开 → 观察者报 `isIntersecting === true`，与 `_visible` 相同 → 不触发重绘 → 图标永久消失；
+   元素还在、占着 18px 空位，`status` 还写着 `rendered`。
+
+所以凡是**显隐由祖先决定**的图标（下拉项、折叠分组、抽屉里的列表）创建时就写
+`setAttribute('noobserver', '')`——这是 iconify-icon 自带的开关，它跳过可见性观察，svg 就留在 shadow
+树里。只在页面加载时可见的静态图标可以不管。验收要「关掉再打开」量一次，打开一次看不出来：
+元素仍存在、`status` 仍是对的，只有 shadow 里的 svg 和宽度是 0。
+
 ## 7. 组合式外壳与页面契约
 
 ### 外壳组件：自己持 chrome，正文走 slot
