@@ -121,3 +121,45 @@ Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，两条都会炸（2
 - 标签名一律带项目前缀（`ktjs-` / `dfk-` / `x-`），便于 grep，也避免与宿主冲突。
 - 只在 Node 求值的包**不要** import 定义元素的模块：顶层 `class X extends HTMLElement` 会在 Node 求值时
   炸。把浏览器专属代码单独一个入口，由浏览器包加载。
+
+## 7. 组合式外壳与页面契约
+
+### 外壳组件：自己持 chrome，正文走 slot
+
+「标题 + 提示 + 内容盒」这类重复结构做成**一个容器组件**，不是使用者继承的基类：
+
+```text
+<kmp-section>                  ← 外壳组件：自己的 shadow root = h2 + p + <slot>
+  └─ shadow: h2 / p / slot     ← 标题与提示由外壳的 sheet 上色；:host 承担区块间距
+```
+
+- 使用者（各区块）把正文节点 append 到外壳这个元素上，由 `<slot>` 投影进外壳的盒子；正文仍在**使用者自己
+  的 shadow 树**里，吃使用者的 sheet。
+- 外壳**不** adopt 使用者的 sheet，使用者**不** adopt 外壳的 sheet（唯一共享的只有 reset）。
+- 外壳提供命名 setter 改标题/提示（`setText(...)`），使用者不碰外壳内部节点。
+- 对比反例：让使用者继承外壳、或把 `h2`/`p`/`div` 三个裸节点交给使用者自己塞——前者引入基类，后者让
+  「外壳是容器」这件事消失，页面看起来还是散的。
+
+### 页面：一个列表 + 一个契约接口
+
+页面元素只做组合，最省事也最不容易漏的写法是让组件自己声明能力：
+
+```kotlin
+/** 页面挂载、并在换语言时就地重贴文案的部件。实现者都是自定义元素，所以它自己就是那个节点。 */
+internal interface PageBlock {
+    val node: HTMLElement get() = this as HTMLElement   // 9 个实现者零样板
+    fun applyTranslation(translation: Translation)
+}
+
+internal class DemoPage : CustomElementAdapter(), … {
+    private val blocks: List<PageBlock> = listOf(header, browser, invocation, …)
+    init { blocks.forEach { shadow.appendChild(it.node) } }
+    private fun applyTranslation(t: Translation) = blocks.forEach { it.applyTranslation(t) }
+}
+```
+
+反例按「坏的程度」排：① 每个组件字段各写一次 `appendChild` + 换语言时各写一次调用（加一个区块要改两处，
+且容易漏）；② 元素列表配一份 `(Translation) -> Unit` 的 lambda 列表（两套清单、契约落在页面这边）；
+③ 用 `as?` 就地强转去找「谁能换语言」（拼写错误与漏实现都变成静默失效）。
+
+三条纪律：契约由**组件**声明（不是页面替它声明）；页面只持有一个列表；新增部件 = 加一个字段 + 往列表加一行。
