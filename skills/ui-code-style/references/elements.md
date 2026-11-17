@@ -119,6 +119,11 @@ Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，前两条都会炸�
 | 生命周期 | 方法覆写 | `@JsName` 方法，`override fun connectedCallback()` |
 | 注册 | `customElements.define(name, Class)`，包一层 `defineIfMissing` 便于重复 import | 同上；名字用 `TagName` 常量持有 |
 
+**不要在 `createElement` 上再包一层**（`element(tag, className, vararg children)` 这种）：`createElement`
+的 lambda 已经是元素自己的接收者，`textContent`、`classList`、`append` 直接写在块里；多包一层反而只剩
+「建完再 `.apply { … }`」这一条路，比直接用还长。确实需要按语义反复 create 的（`paragraph()`、`codeText()`）
+才建命名 helper，而且它们内部也该写 `createElement { }`。
+
 ## 6. 升级时机与命名
 
 - **注册放在框架 hydration 之后**：静态 `<script>` 写在 `<head>` 会早于 hydration，元素先升级就让 React
