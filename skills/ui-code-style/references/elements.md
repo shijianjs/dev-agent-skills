@@ -141,8 +141,12 @@ button.labelText.clear()           // 删
 - 内置类型有工厂：`attribute(name)`（`String`）、`booleanAttribute`、`intAttribute`、
   `doubleAttribute`；自定义 codec 用 `attribute(name, codec)`——调用点不写类型参数。
 - 对象不持状态：读走 `getAttribute`、写走 `setAttribute`，任何来源写入的值下一次读都能看到。
-- 词列表（`theme`、`aria-describedby`、`data-tags`）用 `element.tokens(name)` 拿 `TokenListAttribute`，
-  在它上面 `add` / `remove` / `toggle` / `clear` / `value`；写空列表即删属性。
+- 词列表（`theme`、`aria-describedby`、`data-tags`）用 `element.tokenListAttribute(name)` 拿
+  `TokenListAttribute`，在它上面 `add` / `remove` / `toggle` / `clear` / `value`；写空列表即删属性。
+- **属性名字符串只写一处**：与页面包并列开一个包（如 `wrapper/`），声明
+  `val ThemePropertyMixin.themeAttr: TokenListAttribute get() =
+  unsafeCast<HTMLElement>().tokenListAttribute("theme")`，页面里统一调 `themeAttr`。`external` 类上的
+  属性名编译器查不出错，字符串重复一次就多一个错处。
 - **没有 `by` 版本**：`external` 类上只能声明扩展属性，而 Kotlin 不委托扩展属性——这就是做成对象的理由。
 
 ## 6. 升级时机与命名
