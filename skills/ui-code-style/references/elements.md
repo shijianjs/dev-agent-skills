@@ -124,19 +124,26 @@ Kotlin 类**不能**直接 `: HTMLElement` 走官方写法，前两条都会炸�
 「建完再 `.apply { … }`」这一条路，比直接用还长。确实需要按语义反复 create 的（`paragraph()`、`codeText()`）
 才建命名 helper，而且它们内部也该写 `createElement { }`。
 
-### 元素不是自己的时候：属性靠定义，不靠委托
+### 元素不是自己的时候：属性做成「绑定元素的对象」
 
 `attr { }` 这种把属性委托给 attribute 的写法只适用于**自己的组件**（它在自己的元素上注册、上报变化、
 持有默认值）。wrapper 仓库返回的元素（`createButton()` → `ButtonElement`、`createCard()` →
-`CardElement`）是 `external` 类，成员列表固定，能力要靠**声明 + 函数**拿到：
+`CardElement`）是 `external` 类，成员列表固定，能力要靠**扩展属性交出一个操作对象**拿到：
 
-- 声明一个 `Attribute<T>(name, codec)`（名字 + 编解码器，无状态），用 `readAttribute` / `writeAttribute`
-  读写，用 `tokens(attribute)` 处理词列表（`add` / `remove` / `toggle` / `clear`）。每次调用直接读写
-  属性本身，没有缓存副本。
-- **没有 `by` 版本**：`external` 类上只能声明扩展属性，而 Kotlin 不委托扩展属性；真想要属性写法就在
-  调用点自己写 `get()` / `set()` 两个访问器。
-- 词列表优先于整串字符串：`theme`、`aria-describedby`、`data-tags` 这类「一组词」的属性用
-  `TokenListAttributeCodec`，写空列表即删属性，于是「没有词」和「属性缺失」是同一个状态。
+```kotlin
+val ButtonElement.labelText: Attribute<String> get() = attribute("aria-label")
+
+button.labelText.value = "Close"   // 写
+button.labelText.value             // 读
+button.labelText.clear()           // 删
+```
+
+- 内置类型有工厂：`attribute(name)`（`String`）、`booleanAttribute`、`intAttribute`、
+  `doubleAttribute`；自定义 codec 用 `attribute(name, codec)`——调用点不写类型参数。
+- 对象不持状态：读走 `getAttribute`、写走 `setAttribute`，任何来源写入的值下一次读都能看到。
+- 词列表（`theme`、`aria-describedby`、`data-tags`）用 `element.tokens(name)` 拿 `TokenListAttribute`，
+  在它上面 `add` / `remove` / `toggle` / `clear` / `value`；写空列表即删属性。
+- **没有 `by` 版本**：`external` 类上只能声明扩展属性，而 Kotlin 不委托扩展属性——这就是做成对象的理由。
 
 ## 6. 升级时机与命名
 
