@@ -25,6 +25,7 @@ npx skills add shijianjs/dev-agent-skills --list
 | [long-task-tracking](skills/long-task-tracking/SKILL.md) | 为跨多个 AI 对话上下文的长期 Git 开发任务建立和维护持久化进度清单，确保任务范围、完成状态、排除事项和后续工作可以准确恢复。 |
 | [intellij-mcp-plugins](skills/intellij-mcp-plugins/SKILL.md) | 用脚本或命令行调用 IntelliJ IDEA 的 MCP server，查类型继承树（父类链 + 子实现）、实现列表与覆盖方法（Java / Kotlin/JVM / Kotlin/JS），含通用 MCP 客户端与继承树渲染脚本。 |
 | [ui-code-style](skills/ui-code-style/SKILL.md) | 原生 DOM 写 UI 的组织与样式规范：目录/包/文件按业务语义切分（可递归）而非技术类型、保留模式而非 state→render、静态样式进组件自己的一份 sheet + class（内联只留给运行时才变的少数值，是性能妥协）、sheet 与组件同处且作用域限制在组件内、页面组合用槽位外壳 + 契约接口、图标用 `iconify-icon`；含 TS 与 Kotlin/JS 两套落地写法。 |
+| [coding-preferences](skills/coding-preferences/SKILL.md) | 通用编程取舍偏好，主线是面向对象 + 作用域思维：状态按生命周期归层（集群 / 进程 / 会话 / 请求 / 对象，下层可见上层、上层看不到下层，提升可见性=上移一级）、对象同时持有状态与方法而非 Dto + Service 两分、参数 ≥4 抽命令对象、方法 ≤10 行且语义单一、扩展点必须能被识别与注册、`by lazy` 收一次性计算、协程 + 类型化异常、批量是「重载 + 并发单条」、兑现不了的参数直接删；含评审清单。 |
 
 ## 仓库结构
 
